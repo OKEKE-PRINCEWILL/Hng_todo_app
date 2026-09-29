@@ -81,9 +81,11 @@ The defaults in `compose.yaml` and Spring Boot match for local development. Set 
 | `DATABASE_URL` | `jdbc:postgresql://localhost:5432/todo` | PostgreSQL JDBC URL |
 | `DATABASE_USERNAME` | `todo` | Database username |
 | `DATABASE_PASSWORD` | `todo` | Local development password; replace when deploying |
+| `DATABASE_MAX_POOL_SIZE` | `5` | Maximum database connections used by this service |
+| `APP_API_KEY` | empty | Shared server-to-server key; required on Render |
 | `PORT` | `8080` | Backend port |
 
-In the `frontend` folder, copy `.env.example` to `.env.local` to override `BACKEND_URL`. This is a server-only variable; it must point to the running Spring Boot service. Browser requests use the Next.js same-origin API proxy, so no CORS configuration is needed.
+In the `frontend` folder, copy `.env.example` to `.env.local` to override `BACKEND_URL`. `BACKEND_URL` and `BACKEND_API_KEY` are server-only variables. The API key must match the backend's `APP_API_KEY`. Browser requests use the Next.js same-origin API proxy, so neither value is exposed to browser JavaScript and no CORS configuration is needed.
 
 ## Database migrations
 
@@ -120,6 +122,8 @@ The interface refreshes every minute while visible and when the window regains f
 | PATCH | `/api/tasks/{id}/subtasks/{subtaskId}/completion` | Set independent subtask completion |
 | DELETE | `/api/tasks/{id}` | Permanently delete parent and subtasks |
 
+When `APP_API_KEY` is configured, every `/api/*` request must send the same value in the `X-API-Key` header. The Next.js proxy adds this header using its server-only `BACKEND_API_KEY`. `/actuator/health` remains public for platform health checks and does not expose health details.
+
 Task input:
 
 ```json
@@ -148,9 +152,11 @@ Backend integration tests use Testcontainers to start an isolated PostgreSQL 17 
 
 ## Production deployment
 
-1. Provision PostgreSQL (Neon, Supabase PostgreSQL or another provider). Use the provider's JDBC connection details and SSL settings.
-2. Build the backend with `./mvnw clean package`. Run `java -jar target/todo-0.0.1-SNAPSHOT.jar` on a Java-capable host or container platform. Set the database variables and `PORT` if required. Keep the service running for scheduled cleanup.
-3. Deploy the `frontend` folder as the Vercel project root. Vercel builds Next.js. Set `BACKEND_URL` to the reachable HTTPS backend URL.
-4. Apply network/deployment access restrictions appropriate to a private, single-user application. **There is no application authentication by design; anyone able to reach the app/API can read and change its tasks.** Do not publish private tasks on an unrestricted deployment.
+1. Create a Render PostgreSQL database and backend web service in the same region.
+2. Choose the Docker runtime, use the repository-root `Dockerfile`, and leave Docker Command empty. Set the health check path to `/actuator/health`.
+3. Configure `DATABASE_URL` as a JDBC URL based on Render's internal database host, plus `DATABASE_USERNAME` and `DATABASE_PASSWORD`. Render supplies `PORT` automatically.
+4. Generate a random `APP_API_KEY` of at least 32 characters in Render. The service intentionally refuses to start on Render without a strong key.
+5. Deploy the `frontend` folder as the Vercel project root at [hng-todo-app-lemon.vercel.app](https://hng-todo-app-lemon.vercel.app/). Set `BACKEND_URL` to the Render HTTPS URL and set `BACKEND_API_KEY` to the exact value used for `APP_API_KEY`.
+6. Enable Vercel Deployment Protection or another access-control layer if the tasks must be private. The shared API key authenticates the Next.js server to the backend; it does not authenticate individual visitors.
 
-Spring Boot runs separately from the Vercel frontend. Database migrations run with the backend, and cleanup uses Spring scheduling rather than Vercel Cron. No deployment is performed by this repository.
+Spring Boot runs separately from the Vercel frontend. Flyway migrations run when the backend starts, and cleanup uses Spring scheduling rather than Vercel Cron. The public Render health endpoint reports only status; application data endpoints require the server-to-server key.

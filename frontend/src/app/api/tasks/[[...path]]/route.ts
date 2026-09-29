@@ -17,9 +17,16 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path?: s
     }
   }
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "X-Timezone": request.headers.get("x-timezone") ?? "UTC",
+    };
+    const apiKey = process.env.BACKEND_API_KEY;
+    if (apiKey) headers["X-API-Key"] = apiKey;
+
     const response = await fetch(url, {
       method: request.method,
-      headers: { "Content-Type": "application/json", "X-Timezone": request.headers.get("x-timezone") ?? "UTC" },
+      headers,
       body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.text(),
       cache: "no-store", signal: AbortSignal.timeout(15000),
     });
