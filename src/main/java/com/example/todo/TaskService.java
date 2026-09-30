@@ -18,21 +18,21 @@ public class TaskService {
         this.tasks = tasks; this.settings = settings; this.clock = clock;
     }
     public List<TaskView> list(String timezone) {
-        final ZoneId zone;
-        try { zone = ZoneId.of(timezone); }
-        catch (DateTimeException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid browser timezone."); }
+        ZoneId zone = parseTimezone(timezone);
         var preference = settings.findById(1).orElseGet(AppSettings::new);
         preference.timezone = zone.getId();
         settings.save(preference);
         cleanup();
         return tasks.findAll().stream().map(TaskView::of).toList();
     }
-    public TaskView create(TaskInput input) {
+    public TaskView create(TaskInput input, String timezone) {
+        validateDueDate(input.dueDate(), parseTimezone(timezone));
         Task task = new Task(); task.createdAt = clock.instant();
         apply(task, input);
         return TaskView.of(tasks.saveAndFlush(task));
     }
-    public TaskView update(UUID id, TaskInput input) {
+    public TaskView update(UUID id, TaskInput input, String timezone) {
+        validateDueDate(input.dueDate(), parseTimezone(timezone));
         Task task = find(id); apply(task, input);
         return TaskView.of(tasks.saveAndFlush(task));
     }
@@ -60,6 +60,19 @@ public class TaskService {
     }
     private Task find(UUID id) {
         return tasks.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found."));
+    }
+    private ZoneId parseTimezone(String timezone) {
+        try {
+            return ZoneId.of(timezone);
+        } catch (DateTimeException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid browser timezone.");
+        }
+    }
+    private void validateDueDate(LocalDate dueDate, ZoneId timezone) {
+        LocalDate today = LocalDate.ofInstant(clock.instant(), timezone);
+        if (dueDate != null && dueDate.isBefore(today)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Due date cannot be in the past.");
+        }
     }
     private void apply(Task task, TaskInput input) {
         task.title = input.title().strip(); task.description = input.description();

@@ -78,6 +78,12 @@ class TaskApiTest {
         mvc.perform(post("/api/tasks").contentType("application/json").content(input("   "))).andExpect(status().isBadRequest());
         mvc.perform(post("/api/tasks").contentType("application/json").content(input("x".repeat(151)))).andExpect(status().isBadRequest());
         mvc.perform(post("/api/tasks").contentType("application/json").content(input("x").replace("2026-09-28", "2026-99-99"))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/tasks").contentType("application/json").content(input("Past due").replace("2026-09-28", "2026-09-27")))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Due date cannot be in the past."));
+        when(clock.instant()).thenReturn(Instant.parse("2026-09-28T23:30:00Z"));
+        mvc.perform(post("/api/tasks").header("X-Timezone", "Africa/Lagos").contentType("application/json").content(input("Past locally")))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Due date cannot be in the past."));
+        when(clock.instant()).thenReturn(now);
         mvc.perform(get("/api/tasks").header("X-Timezone", "invalid-zone")).andExpect(status().isBadRequest());
         var first = create("First"); var second = create("Second");
         String invalid = json.writeValueAsString(Map.of("title", "Second", "priority", "MEDIUM", "subtasks", List.of(Map.of("id", first.get("subtasks").get(0).get("id").asText(), "title", "Not mine", "completed", false))));

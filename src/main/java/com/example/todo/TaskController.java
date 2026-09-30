@@ -14,8 +14,22 @@ public class TaskController {
     @GetMapping List<TaskView> list(@RequestHeader(value = "X-Timezone", defaultValue = "UTC") String timezone) {
         return service.list(timezone);
     }
-    @PostMapping @ResponseStatus(HttpStatus.CREATED) TaskView create(@Valid @RequestBody TaskInput input) { return service.create(input); }
-    @PutMapping("/{id}") TaskView update(@PathVariable UUID id, @Valid @RequestBody TaskInput input) { return service.update(id, input); }
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    TaskView create(
+        @RequestHeader(value = "X-Timezone", defaultValue = "UTC") String timezone,
+        @Valid @RequestBody TaskInput input
+    ) {
+        return service.create(input, timezone);
+    }
+    @PutMapping("/{id}")
+    TaskView update(
+        @PathVariable UUID id,
+        @RequestHeader(value = "X-Timezone", defaultValue = "UTC") String timezone,
+        @Valid @RequestBody TaskInput input
+    ) {
+        return service.update(id, input, timezone);
+    }
     @PatchMapping("/{id}/completion") TaskView complete(@PathVariable UUID id, @Valid @RequestBody Completion input) {
         return service.complete(id, input.completed());
     }
