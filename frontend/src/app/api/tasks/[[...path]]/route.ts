@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requestBackend } from "@/lib/backend-request";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 async function proxy(request: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const { path = [] } = await context.params;
   const base = process.env.BACKEND_URL ?? "http://127.0.0.1:8080";
@@ -17,6 +20,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path?: s
     }
   }
   try {
+    const hasBody = !["GET", "HEAD"].includes(request.method);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "X-Timezone": request.headers.get("x-timezone") ?? "UTC",
@@ -24,11 +28,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path?: s
     const apiKey = process.env.BACKEND_API_KEY;
     if (apiKey) headers["X-API-Key"] = apiKey;
 
-    const response = await fetch(url, {
+    const response = await requestBackend(url, {
       method: request.method,
       headers,
-      body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.text(),
-      cache: "no-store", signal: AbortSignal.timeout(15000),
+      body: hasBody ? await request.text() : undefined,
+      cache: "no-store",
     });
     return new NextResponse(response.status === 204 ? null : await response.text(), {
       status: response.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },

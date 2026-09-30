@@ -158,5 +158,6 @@ Backend integration tests use Testcontainers to start an isolated PostgreSQL 17 
 4. Generate a random `APP_API_KEY` of at least 32 characters in Render. The service intentionally refuses to start on Render without a strong key.
 5. Deploy the `frontend` folder as the Vercel project root at [hng-todo-app-lemon.vercel.app](https://hng-todo-app-lemon.vercel.app/). Set `BACKEND_URL` to the Render HTTPS URL and set `BACKEND_API_KEY` to the exact value used for `APP_API_KEY`.
 6. Enable Vercel Deployment Protection or another access-control layer if the tasks must be private. The shared API key authenticates the Next.js server to the backend; it does not authenticate individual visitors.
+7. For a free Render web service, the scheduled GitHub Actions workflow calls the Vercel `/api/health` route every ten minutes. That status-only route uses the server-side `BACKEND_URL` to keep Render awake. Read requests also wait longer and retry once if Render is waking up; mutations are never retried automatically.
 
 Spring Boot runs separately from the Vercel frontend. Flyway migrations run when the backend starts, and cleanup uses Spring scheduling rather than Vercel Cron. The public Render health endpoint reports only status; application data endpoints require the server-to-server key.
